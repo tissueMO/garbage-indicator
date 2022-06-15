@@ -16,7 +16,7 @@ dayjs.tz.setDefault('Asia/Tokyo');
 
 const PORT = 8080;
 const MASTER_ORIGIN_PATH = 'master.origin.json';
-const MASTER_PATH = '/app/master.json';
+const MASTER_PATH = '/app/data/master.json';
 const MAX_DAYS_COUNT = 99;
 
 /**
