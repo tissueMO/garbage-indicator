@@ -1,17 +1,25 @@
-// ########################################################
-//  M5Stack - 2種類同時表示タイプ
-// ########################################################
-#include <M5Stack.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "settings.h"
+#if TYPE_COUNT == 1
+  // 1種類表示タイプ
+  #include <M5StickC.h>
+#elif TYPE_COUNT == 2
+  // 2種類同時表示タイプ
+  #include <M5Stack.h>
+#endif
 
 // 機器固有設定
-const int TYPE_COUNT = 2;
+#if TYPE_COUNT == 1
+const char *types[TYPE_COUNT][2] = {
+  {"recyclable", "Recyclable"}
+};
+#elif TYPE_COUNT == 2
 const char *types[TYPE_COUNT][2] = {
   {"plastic", "Plastic"},
   {"burnable", "Burnable"}
 };
+#endif
 
 // ネットワーク設定
 const char *ssid = SSID;
@@ -34,10 +42,16 @@ void setup()
   M5.begin();
 
   // LCD スクリーン初期化
-  M5.Lcd.clear(BLACK);
+  M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(WHITE);
-  M5.Lcd.setTextSize(2);
+#if TYPE_COUNT == 1
+  M5.Axp.ScreenBreath(9);
+  M5.Lcd.setRotation(3);
+  M5.Lcd.setTextSize(1);
+#elif TYPE_COUNT == 2
   M5.Lcd.setBrightness(32);
+  M5.Lcd.setTextSize(2);
+#endif
   M5.Lcd.println("Garbage Indicator");
 
   // Wi-Fi 接続
@@ -89,8 +103,10 @@ void updateLatest()
     return;
   }
 
-  M5.Lcd.clear(BLACK);
+  M5.Lcd.fillScreen(BLACK);
+#if TYPE_COUNT == 2
   M5.Lcd.drawLine(0, 20, 320, 20, WHITE);
+#endif
 
   // サーバーから最新情報を取得
   for (int i = 0; i < TYPE_COUNT; i++)
@@ -104,13 +120,22 @@ void updateLatest()
     Serial.print("=");
     Serial.println(days);
 
-    if (i > 0) {
+#if TYPE_COUNT == 1
+    M5.Lcd.drawLine(0, 80 / 2 + 10 / 2, 160 / 2, 80 / 2 + 10 / 2, WHITE);
+    M5.Lcd.setTextSize(1);
+    M5.Lcd.drawCentreString(types[i][1], 160 / 2 - 160 / 4, 80 / 2 - 10 / 2, 1);
+    M5.Lcd.setTextSize(10);
+    M5.Lcd.drawCentreString(days, 160 / 2 + 160 / 4, 80 / 2 - 80 / 4 - 2, 1);
+#elif TYPE_COUNT == 2
+    if (i > 0)
+    {
       M5.Lcd.drawLine(320 / TYPE_COUNT * i, 0, 320 / TYPE_COUNT * i, 240, WHITE);
     }
     M5.Lcd.setTextSize(2);
     M5.Lcd.drawCentreString(types[i][1], 320 / TYPE_COUNT - 320 / TYPE_COUNT / 2 + 320 / TYPE_COUNT * i, 0, 1);
     M5.Lcd.setTextSize(10);
     M5.Lcd.drawCentreString(days, 320 / TYPE_COUNT - 320 / TYPE_COUNT / 2 + 320 / TYPE_COUNT * i, 100, 1);
+#endif
   }
 
   Serial.println("Update Completed.");
