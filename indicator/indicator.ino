@@ -49,7 +49,8 @@ void setup()
   M5.Lcd.setRotation(3);
   M5.Lcd.setTextSize(1);
 #elif TYPE_COUNT == 2
-  M5.Lcd.setBrightness(32);
+  M5.Lcd.setBrightness(24);
+  M5.Lcd.setRotation(3);
   M5.Lcd.setTextSize(2);
 #endif
   M5.Lcd.println("Garbage Indicator");
