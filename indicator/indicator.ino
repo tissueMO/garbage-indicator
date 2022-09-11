@@ -46,7 +46,7 @@ void setup()
   M5.Lcd.setTextColor(WHITE);
 #if TYPE_COUNT == 1
   M5.Axp.ScreenBreath(9);
-  M5.Lcd.setRotation(3);
+  M5.Lcd.setRotation(1);
   M5.Lcd.setTextSize(1);
 #elif TYPE_COUNT == 2
   M5.Lcd.setBrightness(24);
