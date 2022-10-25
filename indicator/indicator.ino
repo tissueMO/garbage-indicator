@@ -7,6 +7,9 @@
 #elif TYPE_COUNT == 2
   // 2種類同時表示タイプ
   #include <M5Stack.h>
+#elif TYPE_COUNT == 3
+  // 3種類同時表示タイプ
+  #include <M5Stack.h>
 #endif
 
 // 機器固有設定
@@ -18,6 +21,12 @@ const char *types[TYPE_COUNT][2] = {
 const char *types[TYPE_COUNT][2] = {
   {"plastic", "Plastic"},
   {"burnable", "Burnable"}
+};
+#elif TYPE_COUNT == 3
+const char *types[TYPE_COUNT][3] = {
+  {"plastic", "Plastic"},
+  {"burnable", "Burnable"},
+  {"recyclable", "Recyclable"}
 };
 #endif
 
@@ -48,7 +57,7 @@ void setup()
   M5.Axp.ScreenBreath(9);
   M5.Lcd.setRotation(1);
   M5.Lcd.setTextSize(1);
-#elif TYPE_COUNT == 2
+#elif TYPE_COUNT >= 2
   M5.Lcd.setBrightness(24);
   M5.Lcd.setRotation(3);
   M5.Lcd.setTextSize(2);
@@ -107,6 +116,11 @@ void updateLatest()
   M5.Lcd.fillScreen(BLACK);
 #if TYPE_COUNT == 2
   M5.Lcd.drawLine(0, 20, 320, 20, WHITE);
+  M5.Lcd.drawLine(320 / 2, 0, 320 / 2, 240, WHITE);
+#elif TYPE_COUNT == 3
+  M5.Lcd.drawLine(0, 20, 320, 20, WHITE);
+  M5.Lcd.drawLine(0, 240 / 2 + 20, 320, 240 / 2 + 20, WHITE);
+  M5.Lcd.drawLine(320 / 2, 0, 320 / 2, 240 / 2 + 20, WHITE);
 #endif
 
   // サーバーから最新情報を取得
@@ -123,19 +137,40 @@ void updateLatest()
 
 #if TYPE_COUNT == 1
     M5.Lcd.drawLine(0, 80 / 2 + 10 / 2, 160 / 2, 80 / 2 + 10 / 2, WHITE);
+
     M5.Lcd.setTextSize(1);
     M5.Lcd.drawCentreString(types[i][1], 160 / 2 - 160 / 4, 80 / 2 - 10 / 2, 1);
+
     M5.Lcd.setTextSize(10);
     M5.Lcd.drawCentreString(days, 160 / 2 + 160 / 4, 80 / 2 - 80 / 4 - 2, 1);
+
 #elif TYPE_COUNT == 2
-    if (i > 0)
-    {
-      M5.Lcd.drawLine(320 / TYPE_COUNT * i, 0, 320 / TYPE_COUNT * i, 240, WHITE);
-    }
     M5.Lcd.setTextSize(2);
-    M5.Lcd.drawCentreString(types[i][1], 320 / TYPE_COUNT - 320 / TYPE_COUNT / 2 + 320 / TYPE_COUNT * i, 0, 1);
+    M5.Lcd.drawCentreString(types[i][1], 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 0, 1);
+
     M5.Lcd.setTextSize(10);
-    M5.Lcd.drawCentreString(days, 320 / TYPE_COUNT - 320 / TYPE_COUNT / 2 + 320 / TYPE_COUNT * i, 100, 1);
+    M5.Lcd.drawCentreString(days, 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 100, 1);
+
+#elif TYPE_COUNT == 3
+    if (i < 2)
+    {
+      M5.Lcd.setTextSize(2);
+      M5.Lcd.drawCentreString(types[i][1], 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 0, 1);
+
+      M5.Lcd.setTextSize(10);
+      M5.Lcd.drawCentreString(days, 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 60, 1);
+    }
+    else
+    {
+      M5.Lcd.drawLine(0, 240 / 2 + 240 / 4 + 20, 320 / 2, 240 / 2 + 240 / 4 + 20, WHITE);
+
+      M5.Lcd.setTextSize(2);
+      M5.Lcd.drawCentreString(types[i][1], 320 / 2 - 320 / 4, 240 / 2 + 240 / 4, 1);
+
+      M5.Lcd.setTextSize(10);
+      M5.Lcd.drawCentreString(days, 320 / 2 + 320 / 4, 240 / 2 + 240 / 4 - 10, 1);
+    }
+
 #endif
   }
 
