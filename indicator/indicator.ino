@@ -1,4 +1,3 @@
-#include <WiFi.h>
 #include <HTTPClient.h>
 #include "settings.h"
 #if TYPE_COUNT == 1
@@ -35,11 +34,9 @@ const char *ssid = SSID;
 const char *password = PASSWORD;
 const char *host = HOSTNAME;
 const int port = PORT;
-WiFiClient client;
 const int RESPONSE_TIMEOUT_MILLIS = 5000;
 
 void updateLatest();
-bool connectWiFi();
 String getGarbageDay(int typeIndex);
 
 /*
@@ -108,11 +105,6 @@ void loop()
  */
 void updateLatest()
 {
-  if (!connectWiFi())
-  {
-    return;
-  }
-
   M5.Lcd.fillScreen(BLACK);
 #if TYPE_COUNT == 2
   M5.Lcd.drawLine(0, 20, 320, 20, WHITE);
@@ -178,40 +170,23 @@ void updateLatest()
 }
 
 /**
- * Wi-Fi への接続を行います。
- */
-bool connectWiFi()
-{
-  Serial.print("Connecting to ");
-  Serial.println(host);
-
-  if (!client.connect(host, port))
-  {
-    Serial.println("Connection failed.");
-    return false;
-  }
-
-  return true;
-}
-
-/**
  * 次の収集日までの日数を取得します。
  */
 String getGarbageDay(int typeIndex)
 {
-  HTTPClient httpClient;
-  httpClient.setTimeout(RESPONSE_TIMEOUT_MILLIS);
-  String url = String("/check/") + types[typeIndex][0];
+  HTTPClient client;
+  client.setTimeout(RESPONSE_TIMEOUT_MILLIS);
+  String url = "https://" + String(host) + ":" + String(port) + "/garbage/check/" + types[typeIndex][0];
 
-  if (!httpClient.begin(host, port, url))
+  if (!client.begin(url))
   {
     Serial.println("Connection failed.");
     return "???";
   }
 
-  int httpCode = httpClient.GET();
-  String days = httpClient.getString();
-  httpClient.end();
+  int httpCode = client.GET();
+  String days = client.getString();
+  client.end();
 
   return days;
 }
