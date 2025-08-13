@@ -1,33 +1,8 @@
 #include <HTTPClient.h>
+#include <M5StickC.h>
+#include <WiFi.h>
 #include "settings.h"
-#if TYPE_COUNT == 1
-  // 1種類表示タイプ
-  #include <M5StickC.h>
-#elif TYPE_COUNT == 2
-  // 2種類同時表示タイプ
-  #include <M5Stack.h>
-#elif TYPE_COUNT == 3
-  // 3種類同時表示タイプ
-  #include <M5Stack.h>
-#endif
-
-// 機器固有設定
-#if TYPE_COUNT == 1
-const char *types[TYPE_COUNT][2] = {
-  {"recyclable", "Recyclable"}
-};
-#elif TYPE_COUNT == 2
-const char *types[TYPE_COUNT][2] = {
-  {"plastic", "Plastic"},
-  {"burnable", "Burnable"}
-};
-#elif TYPE_COUNT == 3
-const char *types[TYPE_COUNT][3] = {
-  {"plastic", "Plastic"},
-  {"burnable", "Burnable"},
-  {"recyclable", "Recyclable"}
-};
-#endif
+#include "resources.h"
 
 // ネットワーク設定
 const char *ssid = SSID;
@@ -36,12 +11,33 @@ const char *host = HOSTNAME;
 const int port = PORT;
 const int RESPONSE_TIMEOUT_MILLIS = 5000;
 
-void updateLatest();
-String getGarbageDay(int typeIndex);
+// ゴミ種別
+typedef struct {
+  const char* name;
+  const unsigned short* icon;
+} GarbageType;
 
-/*
-  初回処理
-*/
+const int TYPE_COUNT = 3;
+GarbageType types[TYPE_COUNT] = {
+  {"plastic", PLASTIC_ICON},
+  {"burnable", BURNABLE_ICON},
+  {"recyclable", RECYCABLE_ICON}
+};
+
+// 描画
+TFT_eSprite canvas = TFT_eSprite(&M5.Lcd);
+
+// 動作設定
+const int FONT_NUMBER = 7;
+const int INTERVAL = 10 * 60 * 1000;
+
+// 関数
+void updateLatest();
+int getGarbageDay(int typeIndex);
+
+/**
+ * 初回処理
+ */
 void setup()
 {
   // 初期化
@@ -50,16 +46,14 @@ void setup()
   // LCD スクリーン初期化
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(WHITE);
-#if TYPE_COUNT == 1
-  M5.Axp.ScreenBreath(9);
+  M5.Axp.ScreenBreath(48);
   M5.Lcd.setRotation(1);
   M5.Lcd.setTextSize(1);
-#elif TYPE_COUNT >= 2
-  M5.Lcd.setBrightness(24);
-  M5.Lcd.setRotation(3);
-  M5.Lcd.setTextSize(2);
-#endif
   M5.Lcd.println("Garbage Indicator");
+
+  // ダブルバッファ用スプライト作成
+  canvas.createSprite(M5.Lcd.width(), M5.Lcd.height());
+  canvas.setSwapBytes(true);
 
   // Wi-Fi 接続
   Serial.println();
@@ -73,31 +67,36 @@ void setup()
     Serial.print(".");
   }
 
-  // 接続成功後
   Serial.println();
   Serial.println("Wi-Fi connected.");
   Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
   M5.Lcd.print("IP address: ");
+  Serial.println(WiFi.localIP());
   M5.Lcd.println(WiFi.localIP());
+
+  // 時刻同期
+  configTzTime("JST-9", "ntp.nict.jp");
+  Serial.println("NTP OK.");
+  M5.Lcd.println("NTP OK.");
+
   delay(3000);
 
   // 最新の状態を取得
+  M5.Lcd.setTextFont(FONT_NUMBER);
+  M5.Lcd.setTextSize(7);
   updateLatest();
-  delay(10 * 60 * 1000);
+
+  delay(INTERVAL);
 }
 
-/*
-  メインループ
-*/
+/**
+ * メインループ
+ */
 void loop()
 {
   M5.update();
-
-  // 最新の状態を取得
   updateLatest();
-
-  delay(10 * 60 * 1000);
+  delay(INTERVAL);
 }
 
 /**
@@ -105,66 +104,57 @@ void loop()
  */
 void updateLatest()
 {
-  M5.Lcd.fillScreen(BLACK);
-#if TYPE_COUNT == 2
-  M5.Lcd.drawLine(0, 20, 320, 20, WHITE);
-  M5.Lcd.drawLine(320 / 2, 0, 320 / 2, 240, WHITE);
-#elif TYPE_COUNT == 3
-  M5.Lcd.drawLine(0, 20, 320, 20, WHITE);
-  M5.Lcd.drawLine(0, 240 / 2 + 20, 320, 240 / 2 + 20, WHITE);
-  M5.Lcd.drawLine(320 / 2, 0, 320 / 2, 240 / 2 + 20, WHITE);
-#endif
+  M5.Lcd.startWrite();
+  canvas.fillSprite(BLACK);
 
-  // サーバーから最新情報を取得
-  for (int i = 0; i < TYPE_COUNT; i++)
-  {
-    String days = getGarbageDay(i);
+  // 現在時刻を取得
+  struct tm currentTime;
+  if (!getLocalTime(&currentTime)) {
+    Serial.println("CurrentTime: (Failed)");
+    canvas.drawCentreString("---", 160 / 2, 16, FONT_NUMBER);
+    canvas.pushSprite(0, 0);
+    M5.Lcd.endWrite();
+    return;
+  }
+  Serial.printf("CurrentTime: %04d/%02d/%02d %02d:%02d\n", currentTime.tm_year + 1900, currentTime.tm_mon + 1, currentTime.tm_mday, currentTime.tm_hour, currentTime.tm_min);
+
+  // 次の収集ゴミの種別を取得
+  int hour = currentTime.tm_hour;
+  int targetDays = (0 <= hour && hour < 9) ? 0 : 1;
+  GarbageType* selectedType = nullptr;
+
+  for (int i = 0; i < TYPE_COUNT; i++) {
+    int days = getGarbageDay(i);
 
     Serial.print("[");
     Serial.print(i);
     Serial.print("] ");
-    Serial.print(types[i][1]);
+    Serial.print(types[i].name);
     Serial.print("=");
     Serial.println(days);
 
-#if TYPE_COUNT == 1
-    M5.Lcd.drawLine(0, 80 / 2 + 10 / 2, 160 / 2, 80 / 2 + 10 / 2, WHITE);
-
-    M5.Lcd.setTextSize(1);
-    M5.Lcd.drawCentreString(types[i][1], 160 / 2 - 160 / 4, 80 / 2 - 10 / 2, 1);
-
-    M5.Lcd.setTextSize(10);
-    M5.Lcd.drawCentreString(days, 160 / 2 + 160 / 4, 80 / 2 - 80 / 4 - 2, 1);
-
-#elif TYPE_COUNT == 2
-    M5.Lcd.setTextSize(2);
-    M5.Lcd.drawCentreString(types[i][1], 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 0, 1);
-
-    M5.Lcd.setTextSize(10);
-    M5.Lcd.drawCentreString(days, 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 100, 1);
-
-#elif TYPE_COUNT == 3
-    if (i < 2)
-    {
-      M5.Lcd.setTextSize(2);
-      M5.Lcd.drawCentreString(types[i][1], 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 0, 1);
-
-      M5.Lcd.setTextSize(10);
-      M5.Lcd.drawCentreString(days, 320 / 2 - 320 / 2 / 2 + 320 / 2 * i, 60, 1);
+    if (selectedType == nullptr && days == targetDays) {
+      selectedType = &types[i];
     }
-    else
-    {
-      M5.Lcd.drawLine(0, 240 / 2 + 240 / 4 + 20, 320 / 2, 240 / 2 + 240 / 4 + 20, WHITE);
-
-      M5.Lcd.setTextSize(2);
-      M5.Lcd.drawCentreString(types[i][1], 320 / 2 - 320 / 4, 240 / 2 + 240 / 4, 1);
-
-      M5.Lcd.setTextSize(10);
-      M5.Lcd.drawCentreString(days, 320 / 2 + 320 / 4, 240 / 2 + 240 / 4 - 10, 1);
-    }
-
-#endif
   }
+
+  Serial.print("TargetDays=");
+  Serial.println(targetDays);
+
+  // ゴミ種別に従ってアイコンを描画
+  if (selectedType != nullptr) {
+    canvas.pushImage(8, 0, 80, 80, selectedType->icon);
+    canvas.drawCentreString(String(targetDays), 160 / 2 + 160 / 4 + 6, 18, FONT_NUMBER);
+    Serial.print("Draw: [");
+    Serial.print(selectedType->name);
+    Serial.println("]");
+  } else {
+    canvas.drawCentreString("---", 160 / 2, 16, FONT_NUMBER);
+    Serial.println("Draw: (No garbage collection)");
+  }
+
+  canvas.pushSprite(0, 0);
+  M5.Lcd.endWrite();
 
   Serial.println("Update Completed.");
 }
@@ -172,21 +162,21 @@ void updateLatest()
 /**
  * 次の収集日までの日数を取得します。
  */
-String getGarbageDay(int typeIndex)
+int getGarbageDay(int typeIndex)
 {
   HTTPClient client;
   client.setTimeout(RESPONSE_TIMEOUT_MILLIS);
-  String url = "https://" + String(host) + ":" + String(port) + "/garbage/check/" + types[typeIndex][0];
+  String url = "https://" + String(host) + ":" + String(port) + "/garbage/check/" + types[typeIndex].name;
 
   if (!client.begin(url))
   {
     Serial.println("Connection failed.");
-    return "???";
+    return -1;
   }
 
   int httpCode = client.GET();
   String days = client.getString();
   client.end();
 
-  return days;
+  return days.toInt();
 }

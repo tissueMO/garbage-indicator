@@ -7,5 +7,3 @@
 #define PASSWORD "xxxxxxx"
 #define HOSTNAME "xxxxxxx"
 #define PORT 80
-
-#define TYPE_COUNT 1
